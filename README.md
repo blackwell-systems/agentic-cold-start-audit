@@ -1,6 +1,6 @@
 # ai-cold-start-audit
 
-Cold-start UX auditing for CLI tools. AI agents simulate new users in containerized sandboxes, surfacing friction you can't see yourself.
+Turn AI's lack of context into a feature. Agents cold-start your CLI in a container and report every friction point a new user would hit. Includes a Claude Code `/cold-start-audit` skill.
 
 A filler agent reads your project's help output and subcommands to populate a structured prompt template. An audit agent executes every subcommand as a simulated new user inside a Docker container, producing a severity-tiered findings report with reproduction steps.
 
