@@ -1,4 +1,4 @@
-# ai-cold-start-audit
+# agentic-cold-start-audit
 
 Turn AI's lack of context into a feature. Agents cold-start your CLI in a container and report every friction point a new user would hit. Includes a Claude Code `/cold-start-audit` skill.
 
@@ -60,25 +60,26 @@ See [`workflow.md`](workflow.md) for the full process including permissions setu
 
 ## Example Output
 
-A cold-start audit of [brewprune](https://github.com/blackwell-systems/brewprune) found 21 issues:
+A cold-start audit of [brewprune](https://github.com/blackwell-systems/brewprune) found 18 issues:
 
 | Severity | Count |
 |----------|-------|
 | UX-critical | 5 |
-| UX-improvement | 9 |
-| UX-polish | 7 |
+| UX-improvement | 8 |
+| UX-polish | 5 |
 
 Sample finding:
 
 ```
-### [ANALYSIS] Score logic marks recently-used packages as "SAFE" to remove
+### [DIAGNOSTICS] `doctor` output uses "Fix:" label but --fix flag does not exist
 
 - Severity: UX-critical
-- What happens: After running jq --version via shims, jq receives score 80 (SAFE).
-  The explain output says "Usage: 40/40 pts - used today" AND "Why SAFE: rarely used,
-  safe to remove." These directly contradict each other.
-- Expected: A package used today should score very LOW for removal confidence.
-- Repro: Use shimmed packages, wait 35s, then brewprune explain jq
+- What happens: `doctor` output says "Fix: add shim directory to PATH before Homebrew"
+  — the word "Fix:" implies a --fix flag. Running `brewprune doctor --fix` returns
+  Error: unknown flag: --fix (exit 1).
+- Expected: Either implement --fix to automate the remediation, or rename the label
+  from "Fix:" to "Action needed:" to avoid implying a flag exists.
+- Repro: brewprune doctor → brewprune doctor --fix
 ```
 
 ## Files
