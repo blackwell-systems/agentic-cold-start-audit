@@ -6,7 +6,7 @@ A filler agent reads your project's help output and subcommands to populate a st
 
 ## Why
 
-You can't UX-test your own tool — you know too much. AI agents have zero prior context, making them ideal cold-start testers. Run them in a disposable container with full access and they'll find the friction you can't see.
+You can't UX-test your own tool - you know too much. AI agents have zero prior context, making them ideal cold-start testers. Run them in a disposable container with full access and they'll find the friction you can't see.
 
 ## Quickstart
 
@@ -28,14 +28,14 @@ See [`sandbox-setup.md`](sandbox-setup.md) for Dockerfile patterns and container
 
 ## How It Works
 
-1. **Build a sandbox** — Docker container with your tool installed in a clean environment
-2. **Filler agent** — runs `--help` on every subcommand, inspects the environment, and populates the prompt template with real commands
-3. **Audit agent** — executes the filled prompt inside the container as a new user, noting every output, error, and friction point
-4. **Structured report** — findings grouped by area with severity tiers and exact reproduction steps
+1. **Build a sandbox** - Docker container with your tool installed in a clean environment
+2. **Filler agent** - runs `--help` on every subcommand, inspects the environment, and populates the prompt template with real commands
+3. **Audit agent** - executes the filled prompt inside the container as a new user, noting every output, error, and friction point
+4. **Structured report** - findings grouped by area with severity tiers and exact reproduction steps
 
 ## Usage with Claude Code
 
-Clone this repo and the project-level skill at `.claude/commands/cold-start-audit.md` works automatically. Or copy [`prompts/cold-start-audit-skill.md`](prompts/cold-start-audit-skill.md) to `~/.claude/commands/cold-start-audit.md` for a global slash command — update the file paths to absolute paths after copying.
+Clone this repo and the project-level skill at `.claude/commands/cold-start-audit.md` works automatically. Or copy [`prompts/cold-start-audit-skill.md`](prompts/cold-start-audit-skill.md) to `~/.claude/commands/cold-start-audit.md` for a global slash command - update the file paths to absolute paths after copying.
 
 ```bash
 # Setup only: discover tool metadata and generate the filled audit prompt
@@ -54,7 +54,7 @@ You can run the audit manually without the Claude Code skill:
 
 1. Substitute `{{CONTAINER_NAME}}`, `{{TOOL_NAME}}`, and `{{OUTPUT_PATH}}` in [`prompts/filler-agent-prompt.md`](prompts/filler-agent-prompt.md) and give it to Claude Code (or any AI agent with bash access)
 2. The filler agent produces a filled audit prompt
-3. Give the filled prompt to a fresh agent session — the agent runs all commands and writes the report
+3. Give the filled prompt to a fresh agent session - the agent runs all commands and writes the report
 
 See [`workflow.md`](workflow.md) for the full process including permissions setup, prerequisites, and a pre-launch checklist.
 
@@ -75,7 +75,7 @@ Sample finding:
 
 - Severity: UX-critical
 - What happens: After running jq --version via shims, jq receives score 80 (SAFE).
-  The explain output says "Usage: 40/40 pts — used today" AND "Why SAFE: rarely used,
+  The explain output says "Usage: 40/40 pts - used today" AND "Why SAFE: rarely used,
   safe to remove." These directly contradict each other.
 - Expected: A package used today should score very LOW for removal confidence.
 - Repro: Use shimmed packages, wait 35s, then brewprune explain jq
@@ -85,7 +85,7 @@ Sample finding:
 
 | File | Purpose |
 |------|---------|
-| [`workflow.md`](workflow.md) | Repeatable process — prerequisites, permissions, launch steps, triage |
+| [`workflow.md`](workflow.md) | Repeatable process - prerequisites, permissions, launch steps, triage |
 | [`sandbox-setup.md`](sandbox-setup.md) | Container design, Dockerfile patterns, docker exec vs bind mount |
 | [`prompts/prompt-template.md`](prompts/prompt-template.md) | Audit prompt template with variable table and audit areas structure |
 | [`prompts/filler-agent-prompt.md`](prompts/filler-agent-prompt.md) | Agent that discovers tool metadata and fills the template |
