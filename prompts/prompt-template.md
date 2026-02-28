@@ -11,12 +11,14 @@ Replace all `{{VARIABLE}}` placeholders before passing to the agent.
 |---|---|---|
 | `{{TOOL_NAME}}` | CLI tool being audited | `brewprune` |
 | `{{TOOL_DESCRIPTION}}` | One-sentence description | `finds and removes unused Homebrew packages` |
-| `{{CONTAINER_NAME}}` | Docker container name | `bp-sandbox` |
-| `{{EXEC_PREFIX}}` | Command prefix to exec into container | `docker exec bp-sandbox` |
-| `{{INSTALLED_PACKAGES}}` | Packages available in the environment | `jq, ripgrep, fd, bat, git, curl, tmux` |
+| `{{EXEC_PREFIX}}` | Command prefix for all tool invocations | `docker exec bp-sandbox` / `env COMMITMUX_DB=/tmp/x` / `cd /tmp/audit-repo &&` |
+| `{{SANDBOX_CONTEXT}}` | One-sentence description of the sandbox | `Docker container 'bp-sandbox' with packages: jq, git` / `host machine with COMMITMUX_DB=/tmp/audit-xx/db.sqlite3` |
+| `{{INSTALLED_PACKAGES}}` | Packages in the environment (container mode) or `n/a` | `jq, ripgrep, fd, bat, git, curl, tmux` |
 | `{{SUBCOMMANDS}}` | Subcommands to audit | `scan, status, unused, watch, stats, explain, doctor, remove` |
 | `{{AUDIT_AREAS}}` | Ordered list of areas with specific commands | see below |
 | `{{OUTPUT_PATH}}` | Where to write the final report | `/path/to/docs/cold-start-audit.md` |
+
+`{{CONTAINER_NAME}}` is no longer a required variable — it is captured inside `{{EXEC_PREFIX}}` and `{{SANDBOX_CONTEXT}}` for mode-agnostic prompts.
 
 ---
 
@@ -26,8 +28,7 @@ Replace all `{{VARIABLE}}` placeholders before passing to the agent.
 You are performing a UX audit of {{TOOL_NAME}} — a tool that {{TOOL_DESCRIPTION}}.
 You are acting as a **new user** encountering this tool for the first time.
 
-You have access to a Docker container called `{{CONTAINER_NAME}}` with {{TOOL_NAME}} installed
-and the following packages available: {{INSTALLED_PACKAGES}}.
+Sandbox: {{SANDBOX_CONTEXT}}
 
 Run all commands using: `{{EXEC_PREFIX}} <command>`
 
@@ -61,7 +62,7 @@ Severity guide:
 - Write the complete report to `{{OUTPUT_PATH}}` using the Write tool
 
 IMPORTANT: Run ALL commands via `{{EXEC_PREFIX}} <command>`.
-Do not run {{TOOL_NAME}} directly on the host.
+Do not bypass the sandbox — do not run {{TOOL_NAME}} against production state.
 ```
 
 ---

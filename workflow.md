@@ -55,8 +55,13 @@ Remove or stub out any missing hooks in `~/.claude/settings.json`.
 If you have the `/cold-start-audit` skill installed (see README), the entire workflow is:
 
 ```bash
-# Start your sandbox container, then:
-/cold-start-audit run <container-name> <tool-name>
+# 0. Not sure which sandbox mode to use? Ask first:
+/cold-start-audit mode <tool-name>
+
+# 1. Run the audit (examples per mode):
+/cold-start-audit run <tool-name> --mode container <container-name>
+/cold-start-audit run <tool-name> --mode local --env MYTOOL_DB=/tmp/audit-$$/db.sqlite3
+/cold-start-audit run <tool-name> --mode worktree --dir /path/to/project
 ```
 
 The skill runs the filler agent and audit agent automatically and writes the report to `docs/cold-start-audit.md`.
@@ -67,21 +72,31 @@ The steps below describe the manual workflow for when you want more control or a
 
 ## The Workflow
 
-### Step 1 — Build and start the sandbox
+### Step 1 — Set up the sandbox
 
-Build a Docker image with the tool installed in a realistic user environment.
-See `sandbox-setup.md` for container design options and Dockerfile patterns.
+First, choose a mode. Run `/cold-start-audit mode <tool-name>` for a recommendation, or use this guide:
+- **Container** — tool has destructive ops or modifies system state
+- **Local** — tool writes only to its own DB/config, redirectable via env var
+- **Worktree** — tool reads/writes files in the current directory
+
+**Container mode:** Build a Docker image with the tool installed in a realistic user environment.
+See `sandbox-setup.md` for Dockerfile patterns.
 
 ```bash
 docker build -t <image-name> -f <path/to/Dockerfile> .
 docker run -d --name <container-name> --rm <image-name> sleep 3600
-```
-
-Verify the container is running:
-
-```bash
 docker ps --filter name=<container-name>
 ```
+
+**Local mode:** Create a temp directory and verify the tool accepts the env var.
+
+```bash
+export AUDIT_DIR=$(mktemp -d)
+env MYTOOL_DB=$AUDIT_DIR/db <tool-name> --help
+```
+
+**Worktree mode:** The skill copies the source directory automatically when `--dir` is passed.
+No manual setup needed.
 
 ### Step 2 — Generate the audit prompt
 
@@ -125,11 +140,20 @@ Triage by severity:
 
 ## Checklist Before Launching Agent
 
+**All modes:**
 - [ ] `~/.claude/settings.json` has `"allow": ["Bash", "Read", "Write", "mcp__*"]`
 - [ ] Session was restarted after last settings change
 - [ ] All `PreToolUse` hook scripts exist on disk (or hooks are removed)
-- [ ] Sandbox container is running (`docker ps --filter name=...`)
 - [ ] Audit prompt has been filled with tool-specific commands
+
+**Container mode only:**
+- [ ] Docker is running (`docker ps` succeeds)
+- [ ] Sandbox container is running (`docker ps --filter name=<container-name>`)
+- [ ] Tool is installed in container (`docker exec <container-name> <tool-name> --help`)
+
+**Local mode only:**
+- [ ] Temp directory exists (`ls $AUDIT_DIR`)
+- [ ] Tool accepts the env var (`env KEY=VALUE <tool-name> --help` succeeds)
 
 ---
 

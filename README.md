@@ -1,48 +1,70 @@
 # agentic-cold-start-audit
 
-Turn AI's lack of context into a feature. Agents cold-start your CLI in a container and report every friction point a new user would hit. Includes a Claude Code `/cold-start-audit` skill.
+Turn AI's lack of context into a feature. Agents cold-start your CLI in a sandboxed environment and report every friction point a new user would hit. Includes a Claude Code `/cold-start-audit` skill.
 
-A filler agent reads your project's help output and subcommands to populate a structured prompt template. An audit agent executes every subcommand as a simulated new user inside a Docker container, producing a severity-tiered findings report with reproduction steps.
+A filler agent reads your project's help output and subcommands to populate a structured prompt template. An audit agent executes every subcommand as a simulated new user, producing a severity-tiered findings report with reproduction steps.
 
 ## Why
 
-You can't UX-test your own tool - you know too much. AI agents have zero prior context, making them ideal cold-start testers. Run them in a disposable container with full access and they'll find the friction you can't see.
+You can't UX-test your own tool — you know too much. AI agents have zero prior context, making them ideal cold-start testers. Run them in an isolated sandbox and they'll find the friction you can't see.
 
 ## Quickstart
 
+Not sure which sandbox mode fits your tool? Let the skill decide:
+
 ```bash
-# 1. Build a container with your tool installed
-docker build -t my-tool-sandbox -f Dockerfile.sandbox .
-docker run -d --name my-sandbox --rm my-tool-sandbox sleep 3600
-
-# 2. Verify it works
-docker exec my-sandbox mytool --help
-
-# 3. Run the audit (using the Claude Code skill)
-/cold-start-audit run my-sandbox mytool
+/cold-start-audit mode mytool
+# → Mode recommendation: local | container | worktree
+# → Suggested command: /cold-start-audit run mytool --mode local --env MYTOOL_DB=/tmp/audit-xx/db
 ```
 
-The skill runs a filler agent to discover your tool's subcommands and flags, then launches an audit agent that exercises everything as a new user. The report lands in `docs/cold-start-audit.md`.
+**Container mode** (destructive ops, package managers, system writes):
 
-See [`sandbox-setup.md`](sandbox-setup.md) for Dockerfile patterns and container design options.
+```bash
+docker build -t my-tool-sandbox -f Dockerfile.sandbox .
+docker run -d --name my-sandbox --rm my-tool-sandbox sleep 3600
+/cold-start-audit run mytool --mode container my-sandbox
+```
+
+**Local mode** (tool writes only to its own DB or config, redirectable via env var):
+
+```bash
+/cold-start-audit run mytool --mode local --env MYTOOL_DB=/tmp/audit-$$/db.sqlite3
+```
+
+**Worktree mode** (tool reads/writes files in the current directory):
+
+```bash
+/cold-start-audit run mytool --mode worktree --dir /path/to/project
+```
+
+The report lands in `docs/cold-start-audit.md`.
+
+See [`sandbox-setup.md`](sandbox-setup.md) for setup details, Dockerfile patterns, and mode guidance.
 
 ## How It Works
 
-1. **Build a sandbox** - Docker container with your tool installed in a clean environment
-2. **Filler agent** - runs `--help` on every subcommand, inspects the environment, and populates the prompt template with real commands
-3. **Audit agent** - executes the filled prompt inside the container as a new user, noting every output, error, and friction point
-4. **Structured report** - findings grouped by area with severity tiers and exact reproduction steps
+1. **Choose a sandbox** — container, local env var, or worktree isolation depending on the tool's blast radius. Run `/cold-start-audit mode <tool-name>` if unsure.
+2. **Filler agent** — runs `--help` on every subcommand, inspects the sandbox environment, and populates the prompt template with real commands and the correct exec prefix
+3. **Audit agent** — executes the filled prompt inside the sandbox as a new user, noting every output, error, and friction point
+4. **Structured report** — findings grouped by area with severity tiers and exact reproduction steps
 
 ## Usage with Claude Code
 
-Clone this repo and the project-level skill at `.claude/commands/cold-start-audit.md` works automatically. Or copy [`prompts/cold-start-audit-skill.md`](prompts/cold-start-audit-skill.md) to `~/.claude/commands/cold-start-audit.md` for a global slash command - update the file paths to absolute paths after copying.
+Clone this repo and the project-level skill at `.claude/commands/cold-start-audit.md` works automatically. Or copy [`prompts/cold-start-audit-skill.md`](prompts/cold-start-audit-skill.md) to `~/.claude/commands/cold-start-audit.md` for a global slash command.
 
 ```bash
+# Recommend isolation mode for your tool (no sandbox needed yet)
+/cold-start-audit mode mytool
+
 # Setup only: discover tool metadata and generate the filled audit prompt
-/cold-start-audit setup my-sandbox mytool
+/cold-start-audit setup mytool --mode container my-sandbox
+/cold-start-audit setup mytool --mode local --env MYTOOL_DB=/tmp/audit-$$/db.sqlite3
+/cold-start-audit setup mytool --mode worktree --dir /path/to/project
 
 # Full audit: filler + audit agent (writes report to docs/cold-start-audit.md)
-/cold-start-audit run my-sandbox mytool
+/cold-start-audit run mytool --mode container my-sandbox
+/cold-start-audit run mytool --mode local --env MYTOOL_DB=/tmp/audit-$$/db.sqlite3
 
 # Summarize: read and triage the findings
 /cold-start-audit report
