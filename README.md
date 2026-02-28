@@ -29,7 +29,7 @@ See [`workflow.md`](workflow.md) for the full repeatable process including prere
 
 ## Usage with Claude Code
 
-Copy [`prompts/cold-start-audit-skill.md`](prompts/cold-start-audit-skill.md) to `~/.claude/commands/cold-start-audit.md` for a global `/cold-start-audit` slash command.
+Clone this repo and the project-level skill at `.claude/commands/cold-start-audit.md` works automatically. Or copy [`prompts/cold-start-audit-skill.md`](prompts/cold-start-audit-skill.md) to `~/.claude/commands/cold-start-audit.md` for a global slash command — update the file paths to absolute paths after copying.
 
 ```bash
 # Setup: discover tool metadata and generate the filled audit prompt

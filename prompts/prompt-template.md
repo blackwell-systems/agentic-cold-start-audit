@@ -16,7 +16,7 @@ Replace all `{{VARIABLE}}` placeholders before passing to the agent.
 | `{{INSTALLED_PACKAGES}}` | Packages available in the environment | `jq, ripgrep, fd, bat, git, curl, tmux` |
 | `{{SUBCOMMANDS}}` | Subcommands to audit | `scan, status, unused, watch, stats, explain, doctor, remove` |
 | `{{AUDIT_AREAS}}` | Ordered list of areas with specific commands | see below |
-| `{{OUTPUT_PATH}}` | Where to write the final report | `/path/to/docs/ux-audit.md` |
+| `{{OUTPUT_PATH}}` | Where to write the final report | `/path/to/docs/cold-start-audit.md` |
 
 ---
 

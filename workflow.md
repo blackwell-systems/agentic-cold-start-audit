@@ -126,3 +126,4 @@ Triage by severity:
 | `sandbox-setup.md` | Container design, build steps, bind-mount vs docker exec |
 | `prompt-template.md` | Generalized audit prompt with variable table |
 | `filler-agent-prompt.md` | Agent that discovers tool metadata and fills the template |
+| `cold-start-audit-skill.md` | Portable Claude Code `/cold-start-audit` skill |

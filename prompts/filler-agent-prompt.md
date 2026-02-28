@@ -94,7 +94,7 @@ placeholders). Use the subcommand help output to enumerate real flags. Follow th
 ### Step 4 — Write the filled prompt
 
 Take the prompt template below, substitute all variables with the real values you discovered,
-and write the result to `{{OUTPUT_PATH_FOR_FILLED_PROMPT}}`.
+and write the result to `{{OUTPUT_PATH}}`.
 
 The filled prompt must be self-contained — no placeholders remaining, no references to this
 filler process. It should be copy-pasteable directly into a Task agent call.
