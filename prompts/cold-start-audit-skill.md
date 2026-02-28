@@ -3,9 +3,30 @@ Cold-Start UX Audit: AI agents simulate new users in containerized sandboxes.
 ## Arguments
 
 - `setup <container-name> <tool-name>`: Run the filler agent to discover tool metadata from the running container and produce a filled audit prompt. Write the filled prompt to `docs/cold-start-audit-prompt.md`.
-- `run <container-name> <tool-name>`: Run the full audit. If `docs/cold-start-audit-prompt.md` exists, use it. Otherwise, run the filler agent first to generate it. Launch the audit agent as a background Task agent. Write the findings report to `docs/cold-start-audit.md`.
+- `run <container-name> <tool-name>`: Run the full audit. Checks for existing prompt and offers to reuse/adapt it (update container name and date only) or regenerate from scratch. Launch the audit agent as a background Task agent. Write the findings report to `docs/cold-start-audit.md` (or with round suffix if specified).
 - `report`: Read and summarize the findings from `docs/cold-start-audit.md`, grouped by severity.
 - `init <container-name>`: Scaffold `.claude/settings.json` with scoped permissions for the container.
+
+## Prompt Reuse Strategy
+
+When running subsequent audits on the same tool:
+
+**Check for existing prompt first:**
+1. Look for `docs/cold-start-audit-prompt.md`
+2. If found, read the metadata header to see the previous container name and date
+3. Ask user: "Found existing prompt from [date] using container [name]. Options:
+   - **Reuse** - Update only container name and date (fast, use when tool commands haven't changed)
+   - **Regenerate** - Run filler agent to rediscover everything (use when tool structure changed)"
+
+**When to reuse vs regenerate:**
+- **Reuse** (recommended for iteration rounds): Tool structure is stable, just testing fixes from previous round. Only container name and date need updating.
+- **Regenerate**: New subcommands added, flags changed, or first audit of the tool.
+
+**Implementation:**
+- For reuse: Use Edit tool to update container name throughout and metadata date
+- For regenerate: Run the full filler agent as before
+
+This prevents wasteful parallel execution of filler agent when audit agent doesn't need it.
 
 ## Before Running
 
@@ -236,9 +257,23 @@ The audit agent MUST run in a fresh context with zero knowledge of the project. 
 
 - subagent_type: general-purpose
 - run_in_background: true
-- prompt: the filled audit prompt from `docs/cold-start-audit-prompt.md`
+- prompt: the filled audit prompt content (read from `docs/cold-start-audit-prompt.md` or pass directly as text)
 
 The agent will run 30+ commands against the container, observe behavior at each step, and write the findings report to `docs/cold-start-audit.md`.
+
+**IMPORTANT - Sequencing:**
+
+When regenerating the prompt (not reusing):
+1. Launch filler agent OR run filler steps directly
+2. **Wait for completion** - filler must finish writing the prompt file
+3. Read the completed prompt from the file
+4. **Then** launch audit agent with that prompt content
+
+**Anti-pattern to avoid:**
+- ❌ Launching filler agent in background + immediately launching audit agent with manually-edited old prompt = wasteful parallel execution
+- ✅ Either wait for filler to complete, OR skip filler entirely and reuse/adapt existing prompt
+
+The audit agent receives the prompt as text in its Task invocation, so it doesn't depend on the file after launch. But launching both agents in parallel wastes compute on redundant work.
 
 ## Severity Tiers
 
