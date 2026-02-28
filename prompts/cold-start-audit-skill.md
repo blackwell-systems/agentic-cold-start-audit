@@ -54,7 +54,17 @@ After editing settings, restart the Claude Code session. Settings do not hot-rel
 
 The audit simulates a new user on a fresh machine. A Docker container gives a clean, reproducible environment.
 
+### Container Lifecycle
+
+Understanding the distinction between these three concepts is critical:
+
+- **Dockerfile** (template) - Infrastructure definition, created once and reused across audit rounds. Only update when runtime dependencies or environment setup changes.
+- **Image** (snapshot) - Built from the Dockerfile, captures the tool's compiled binary at a point in time. Rebuild this when the tool's source code changes.
+- **Container** (running instance) - Ephemeral execution environment. Create a new one for each audit round with a round-specific name (e.g., `mytool-r1`, `mytool-r2`).
+
 ### Dockerfile pattern (multi-stage build)
+
+Create `Dockerfile.sandbox` once (or use `docker/Dockerfile.sandbox` if the project already has one):
 
 ```dockerfile
 # Stage 1: build the tool
@@ -75,19 +85,53 @@ CMD ["/bin/bash"]
 
 Adapt the builder stage and dependencies for the tool's language and requirements. Use real dependencies, not mocks - real package managers surface real edge cases.
 
-### Build and run
+### First-time setup
+
+For the initial audit round:
 
 ```bash
-docker build -t <image-name> -f Dockerfile.sandbox .
-docker run -d --name <container-name> --rm <image-name> sleep 3600
-docker ps --filter name=<container-name>
+# Create Dockerfile.sandbox (see pattern above)
+# Build image with round-specific tag
+docker build -t mytool-r1 -f Dockerfile.sandbox .
+# Start container with round-specific name
+docker run -d --name mytool-r1 --rm mytool-r1 sleep 3600
+# Verify
+docker ps --filter name=mytool-r1
 ```
+
+### Subsequent rounds
+
+After fixing issues from a previous round, rebuild the image to pick up the new source code:
+
+```bash
+# Stop and remove old container (if still running)
+docker rm -f mytool-r1
+# Rebuild image from EXISTING Dockerfile with new round tag
+docker build -t mytool-r2 -f Dockerfile.sandbox .
+# Start new container with new round name
+docker run -d --name mytool-r2 --rm mytool-r2 sleep 3600
+```
+
+**Key principle:** The Dockerfile.sandbox is stable infrastructure. Only the image (built binary) and container (running instance) change between rounds.
+
+### When to update the Dockerfile
+
+Only modify Dockerfile.sandbox when:
+- Runtime dependencies change (new packages needed in the container)
+- Tool installation method changes (different build flags, new subcommands to copy)
+- Environment setup changes (different user permissions, PATH modifications)
+
+Do NOT recreate the Dockerfile just because the tool's source code changed — rebuilding the image is sufficient.
 
 ### Cleanup
 
+After completing an audit round:
+
 ```bash
-docker rm -f <container-name>
-docker rmi <image-name>
+# Remove container (happens automatically with --rm flag when container stops)
+docker rm -f mytool-r1
+# Optional: remove image to free disk space
+docker rmi mytool-r1
 ```
 
 ## Filler Agent
