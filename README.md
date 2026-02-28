@@ -27,6 +27,21 @@ See [`workflow.md`](workflow.md) for the full repeatable process including prere
 | [`prompts/filler-agent-prompt.md`](prompts/filler-agent-prompt.md) | Agent that discovers tool metadata and fills the template |
 | [`prompts/cold-start-audit-skill.md`](prompts/cold-start-audit-skill.md) | Portable Claude Code `/cold-start-audit` skill |
 
+## Usage with Claude Code
+
+Copy [`prompts/cold-start-audit-skill.md`](prompts/cold-start-audit-skill.md) to `~/.claude/commands/cold-start-audit.md` for a global `/cold-start-audit` slash command.
+
+```bash
+# Setup: discover tool metadata and generate the filled audit prompt
+/cold-start-audit setup my-sandbox mytool
+
+# Run: execute the full audit (filler + audit agent)
+/cold-start-audit run my-sandbox mytool
+
+# Report: summarize findings by severity
+/cold-start-audit report
+```
+
 ## Severity Tiers
 
 | Tier | Meaning | Action |
