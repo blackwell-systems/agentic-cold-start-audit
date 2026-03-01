@@ -122,6 +122,10 @@ Sample finding:
 | **UX-improvement** | Confusing but functional | Prioritize for next sprint |
 | **UX-polish** | Minor friction or inconsistency | Batch into a cleanup PR |
 
+## Composing with Scout-and-Wave
+
+Audit findings are structured input for parallel fixes. Once you have a severity-tiered findings report, hand it to the [scout-and-wave](https://github.com/blackwell-systems/scout-and-wave) scout: it runs a pre-implementation check to filter already-fixed items, assigns remaining findings to parallel agents with disjoint file ownership, and executes in waves. The [agentic-workflows](https://github.com/blackwell-systems/agentic-workflows) repo documents this Audit-Fix-Verify loop and links to the reference implementation in [brewprune](https://github.com/blackwell-systems/brewprune) — six complete audit→fix cycles across 118 findings.
+
 ## License
 
 MIT
