@@ -77,15 +77,17 @@ Background agents cannot prompt for tool approval. Without an explicit `allow` r
 
 ### Project-level (recommended, scoped)
 
-Create `.claude/settings.json` in the project repo:
+Create `.claude/settings.json` in the project repo. Use a wildcard that covers all round numbers so it doesn't need updating each round:
 
 ```json
 {
   "permissions": {
-    "allow": ["Bash(docker exec <container-name>*)"]
+    "allow": ["Bash(docker exec <tool>-r*)"]
   }
 }
 ```
+
+Example for brewprune: `"Bash(docker exec brewprune-r*)"` covers r1 through r99 without ever needing to update the settings file.
 
 ### User-level (broader, needed for background agents)
 
@@ -107,13 +109,41 @@ After editing settings, restart the Claude Code session. Settings do not hot-rel
 
 The audit simulates a new user on a fresh machine. A Docker container gives a clean, reproducible environment.
 
+### Container Naming Convention
+
+Containers follow the pattern **`{tool}-r{N}`** where N is the audit round number (1, 2, 3…).
+
+**Auto-increment logic** — before creating a new container, determine N automatically:
+
+```bash
+# Find the highest existing round number for this tool
+docker images --format '{{.Repository}}' | grep '^{tool}-r' | sort -V | tail -1
+# e.g. "brewprune-r7" → next round is brewprune-r8
+```
+
+If no existing images are found, start at r1.
+
+### Container Reuse
+
+**Before building a new image, check if a usable container already exists:**
+
+```bash
+docker ps --filter name={tool}-r{N} --format '{{.Names}}'
+```
+
+- **Container is running** → reuse it directly. Skip build and `docker run`. The binary is already in place.
+- **Image exists but container is stopped** → start a new container from the existing image: `docker run -d --name {tool}-r{N} {tool}-r{N} sleep 3600`
+- **No image exists** → build from scratch (see First-time setup below)
+
+Only rebuild the image when source code has changed since the last audit round. If you just want to re-audit the same binary, reuse the existing image.
+
 ### Container Lifecycle
 
 Understanding the distinction between these three concepts is critical:
 
 - **Dockerfile** (template) - Infrastructure definition, created once and reused across audit rounds. Only update when runtime dependencies or environment setup changes.
 - **Image** (snapshot) - Built from the Dockerfile, captures the tool's compiled binary at a point in time. Rebuild this when the tool's source code changes.
-- **Container** (running instance) - Ephemeral execution environment. Create a new one for each audit round with a round-specific name (e.g., `mytool-r1`, `mytool-r2`).
+- **Container** (running instance) - Ephemeral execution environment. Create a new one for each audit round with a round-specific name following the `{tool}-r{N}` pattern.
 
 ### Dockerfile pattern (multi-stage build)
 
@@ -154,15 +184,22 @@ docker ps --filter name=mytool-r1
 
 ### Subsequent rounds
 
-After fixing issues from a previous round, rebuild the image to pick up the new source code:
+After fixing issues from a previous round:
+
+1. **Auto-increment** the round number (see Container Naming Convention above)
+2. **Check for reuse** (see Container Reuse above) — if the binary hasn't changed, reuse the existing image
+3. If source changed, rebuild:
 
 ```bash
-# Stop and remove old container (if still running)
-docker rm -f mytool-r1
+# Determine next round number (e.g. r7 → r8)
+PREV=mytool-r7
+NEXT=mytool-r8
+# Stop old container if running
+docker rm -f $PREV 2>/dev/null || true
 # Rebuild image from EXISTING Dockerfile with new round tag
-docker build -t mytool-r2 -f Dockerfile.sandbox .
-# Start new container with new round name
-docker run -d --name mytool-r2 --rm mytool-r2 sleep 3600
+docker build -t $NEXT -f docker/Dockerfile.sandbox .
+# Start new container
+docker run -d --name $NEXT $NEXT sleep 3600
 ```
 
 **Key principle:** The Dockerfile.sandbox is stable infrastructure. Only the image (built binary) and container (running instance) change between rounds.
