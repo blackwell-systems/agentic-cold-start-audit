@@ -20,9 +20,11 @@ The result is a severity-tiered findings report: what's broken, what's confusing
 Cold-start auditing is most useful when:
 
 1. **Your tool ships to users who don't know you** — Every new user is a cold start. If your tool is public or widely used, discovering friction before release saves support load.
-2. **You iterate on UX and want regression protection** — After fixing a round of findings, re-run the audit. New findings surface regressions; resolved findings confirm the fix landed.
+2. **You iterate on UX and want to catch regressions organically** — Run the audit after each fix round. If old issues regressed, the agent trips over them again the same way a new user would. No explicit regression testing needed.
 3. **Your tool has subcommands, flags, or modes** — The more surface area, the more opportunities for friction. A single-command tool with 2 flags may not benefit; a CLI with 10 subcommands will.
 4. **Your help text is the primary documentation** — If users rely on `--help` chains and examples, cold-start auditing validates that the help text actually teaches the tool.
+
+**This is not regression testing.** The agent has zero knowledge of previous rounds. It discovers friction organically, every time. If a fixed issue breaks again, it surfaces through rediscovery, not through checklist verification. That's the methodology's strength: regressions are caught the same way new problems are — because a fresh user would hit them.
 
 It is less useful for:
 
