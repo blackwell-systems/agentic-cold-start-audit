@@ -104,13 +104,15 @@ When all preconditions hold and all invariants are maintained, the protocol prov
 
 **If the audit agent completes without violating I1, every finding in the report was produced by commands that ran inside the sandbox.** The host's production state was not modified. The findings reflect the tool's behavior from a new user's perspective, not from within a broken or tainted environment.
 
-This is not a guarantee of finding completeness — the audit covers the commands documented in `--help`. Commands with undocumented behavior or interactive prompts may be missed.
+This is not a guarantee of finding completeness — the audit covers the commands documented in `--help`. Commands with undocumented behavior or interactive prompts may be missed. **Coverage gaps are acceptable.** The goal is discovering salient friction that new users actually trip over by following help text, not exhaustive validation of all possible behaviors.
 
 ## Prompt Reuse Policy
 
 On subsequent audits of the same tool:
 
-- **Reuse** (recommended for iteration rounds): If `docs/cold-start-audit-prompt.md` exists and the tool's command structure hasn't changed since it was generated, update only the container name and date. Skips re-running the filler agent.
+- **Reuse** (recommended for iteration rounds): If `docs/cold-start-audit-prompt.md` exists and the tool's command structure hasn't changed since it was generated, update only the container name and date. Skips re-running the filler agent. The audit agent still operates with zero context — reuse only skips the help text discovery phase, not the audit execution.
 - **Regenerate**: If new subcommands have been added, flags have changed, or this is the first audit, run the full filler agent.
 
 The skill checks for an existing prompt and presents the option; the user decides. This preserves human review at the prompt stage.
+
+**Important:** Prompt reuse is a performance optimization, not a change in methodology. The audit agent never has knowledge of previous findings — it discovers friction organically by executing commands and observing output.

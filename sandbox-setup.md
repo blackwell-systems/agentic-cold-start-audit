@@ -216,8 +216,7 @@ rm -rf $AUDIT_DIR
 
 ### Subsequent rounds
 
-Repeat the `mktemp -d` setup — each round gets a fresh empty state, equivalent to a new user
-running the tool for the first time.
+Repeat the `mktemp -d` setup — each round gets a fresh empty state, equivalent to a new user running the tool for the first time. The agent has no memory of what it found before; it just runs commands and reports what happens.
 
 ---
 

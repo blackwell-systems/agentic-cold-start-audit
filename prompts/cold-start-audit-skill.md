@@ -39,7 +39,7 @@ When running subsequent audits on the same tool:
    - **Regenerate** - Run filler agent to rediscover everything (use when tool structure changed)"
 
 **When to reuse vs regenerate:**
-- **Reuse** (recommended for iteration rounds): Tool structure is stable, just testing fixes from previous round. Only container name and date need updating.
+- **Reuse** (recommended for iteration rounds): Tool structure is stable, no new commands or flags. Only container name and date need updating. The agent still discovers organically — reuse just skips re-reading help text.
 - **Regenerate**: New subcommands added, flags changed, or first audit of the tool.
 
 **Implementation:**
@@ -184,7 +184,7 @@ docker ps --filter name=mytool-r1
 
 ### Subsequent rounds
 
-After fixing issues from a previous round:
+For subsequent audit cycles (the agent discovers with fresh eyes each time):
 
 1. **Auto-increment** the round number (see Container Naming Convention above)
 2. **Check for reuse** (see Container Reuse above) — if the binary hasn't changed, reuse the existing image
@@ -336,9 +336,11 @@ Run all commands using: `docker exec <container-name> <command>`
 
 <filled audit areas with exact commands>
 
-Run ALL commands. Do not skip areas.
+Run ALL commands listed. Do not skip areas.
 Note exact output, errors, exit codes, and behavior at each step.
 Describe color usage (e.g. "package names appear in bold white, tier labels in green/yellow/red").
+
+You are not trying to find every possible issue — you are discovering what friction a new user would naturally encounter by following the help text and trying obvious commands.
 
 ## Findings Format
 
@@ -364,6 +366,17 @@ Severity guide:
 IMPORTANT: Run ALL commands via `<exec-prefix> <command>`.
 Do not bypass the sandbox — do not run <tool-name> against production state.
 ```
+
+**CRITICAL - Do NOT add regression verification sections:**
+
+The prompt template above is complete. DO NOT append:
+- Regression verification sections
+- Checklists of known issues to validate
+- "Verify the following fixed behaviors" sections
+- Comparisons to previous audit rounds
+- Any content that gives the audit agent prior knowledge of what issues to look for
+
+Every audit must be pure discovery with zero context. If old issues regressed, they surface through organic rediscovery (agent encounters the same friction) not through explicit verification checklists. Adding regression sections violates the methodology's core principle: the agent simulates a new user with no prior knowledge.
 
 ## Launching the Audit Agent
 

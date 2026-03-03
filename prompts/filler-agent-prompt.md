@@ -144,9 +144,11 @@ Run all commands using: `{{EXEC_PREFIX}} <command>`
 
 {{AUDIT_AREAS}}
 
-Run ALL commands. Do not skip areas.
+Run ALL commands listed. Do not skip areas.
 Note exact output, errors, exit codes, and behavior at each step.
 Describe color usage (e.g. "package names appear in bold white, tier labels in green/yellow/red").
+
+You are not trying to find every possible issue — you are discovering what friction a new user would naturally encounter by following the help text and trying obvious commands.
 
 ## Findings Format
 

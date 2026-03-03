@@ -20,11 +20,11 @@ The result is a severity-tiered findings report: what's broken, what's confusing
 Cold-start auditing is most useful when:
 
 1. **Your tool ships to users who don't know you** — Every new user is a cold start. If your tool is public or widely used, discovering friction before release saves support load.
-2. **You iterate on UX and want to catch regressions organically** — Run the audit after each fix round. If old issues regressed, the agent trips over them again the same way a new user would. No explicit regression testing needed.
+2. **You iterate on UX frequently** — Run the audit after each improvement cycle. The agent's fresh perspective surfaces whatever friction exists now, whether it's a new issue or an old one that regressed. Each audit is pure discovery with zero memory of previous rounds.
 3. **Your tool has subcommands, flags, or modes** — The more surface area, the more opportunities for friction. A single-command tool with 2 flags may not benefit; a CLI with 10 subcommands will.
 4. **Your help text is the primary documentation** — If users rely on `--help` chains and examples, cold-start auditing validates that the help text actually teaches the tool.
 
-**This is not regression testing.** The agent has zero knowledge of previous rounds. It discovers friction organically, every time. If a fixed issue breaks again, it surfaces through rediscovery, not through checklist verification. That's the methodology's strength: regressions are caught the same way new problems are — because a fresh user would hit them.
+**This is pure discovery, not regression testing.** The agent has zero knowledge of previous rounds. It discovers friction organically by following help text and trying obvious commands. If a fixed issue breaks again, it surfaces naturally through rediscovery — the agent hits the same friction a new user would. That's the methodology's strength: you don't maintain test checklists, you just run the agent and see what a fresh user actually encounters.
 
 It is less useful for:
 
@@ -105,7 +105,7 @@ See [`sandbox-setup.md`](sandbox-setup.md) for Dockerfile patterns, Docker setup
 3. **Audit agent** — executes the filled prompt inside the sandbox as a new user, noting every output, error, and friction point.
 4. **Structured report** — findings grouped by area with severity tiers and exact reproduction steps.
 
-For subsequent audits, the skill checks for an existing prompt and offers to reuse it (fast — only updates container name and date) or regenerate from scratch (when tool structure changed). This makes iterative auditing fast.
+For subsequent audits, the skill checks for an existing prompt and offers to reuse it (fast — only updates container name and date) or regenerate from scratch (when tool structure changed). Reusing the prompt doesn't change what the agent discovers — it still runs with zero context — it just skips re-reading help text.
 
 ## Permissions
 
@@ -193,7 +193,7 @@ Audit findings are structured input for parallel fixes. Once you have a severity
 /saw wave
 ```
 
-The scout runs a pre-implementation check to filter already-fixed items, assigns remaining findings to parallel agents with disjoint file ownership, and executes in waves. The [agentic-workflows](https://github.com/blackwell-systems/agentic-workflows) repo documents the full Audit→Fix→Verify loop — six complete cycles across 118 findings in [brewprune](https://github.com/blackwell-systems/brewprune).
+The scout runs a pre-implementation check to filter already-fixed items, assigns remaining findings to parallel agents with disjoint file ownership, and executes in waves. The [agentic-workflows](https://github.com/blackwell-systems/agentic-workflows) repo documents the full Audit→Fix→Rediscover cycle — six complete iterations discovering 118 total findings in [brewprune](https://github.com/blackwell-systems/brewprune). Each audit discovers organically; fixed issues that regress are simply rediscovered.
 
 ## License
 
