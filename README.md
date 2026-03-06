@@ -107,6 +107,28 @@ See [`sandbox-setup.md`](sandbox-setup.md) for Dockerfile patterns, Docker setup
 
 For subsequent audits, the skill checks for an existing prompt and offers to reuse it (fast — only updates container name and date) or regenerate from scratch (when tool structure changed). Reusing the prompt doesn't change what the agent discovers — it still runs with zero context — it just skips re-reading help text.
 
+## Installation
+
+### Custom Agent Types (Optional)
+
+For enhanced observability and tool enforcement, install custom agent types:
+
+```bash
+# From the agentic-cold-start-audit repository:
+mkdir -p ~/.claude/agents
+ln -sf $(pwd)/prompts/agents/filler.md ~/.claude/agents/filler.md
+ln -sf $(pwd)/prompts/agents/audit.md ~/.claude/agents/audit.md
+```
+
+**Benefits:**
+- **Tool enforcement** — Filler agent cannot execute sandbox commands; Audit agent cannot bypass isolation
+- **Claudewatch visibility** — Separate success rates per agent type in metrics
+- **Behavioral instructions** — Carried in the type definition for consistency
+
+**Graceful fallback:** The skill automatically falls back to `general-purpose` agents if custom types are not installed. Installation is recommended but not required.
+
+After installation, restart your Claude Code session (settings are not hot-reloaded).
+
 ## Permissions
 
 Background agents cannot prompt for tool approval. Without an explicit `allow` rule, every `Bash` call is denied and the agent silently fails.

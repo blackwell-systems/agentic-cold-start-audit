@@ -378,11 +378,38 @@ The prompt template above is complete. DO NOT append:
 
 Every audit must be pure discovery with zero context. If old issues regressed, they surface through organic rediscovery (agent encounters the same friction) not through explicit verification checklists. Adding regression sections violates the methodology's core principle: the agent simulates a new user with no prior knowledge.
 
+## Agent Type Preference
+
+Use custom agent types when launching agents. These provide:
+- Tool-level enforcement (filler cannot execute in sandbox, audit cannot bypass isolation)
+- Behavioral instructions in the type definition
+- Better observability in claudewatch metrics (separate success rates per agent type)
+
+**Filler agent:** Use `subagent_type: filler` when spawning the metadata discovery agent.
+**Audit agent:** Use `subagent_type: audit` when spawning the sandbox execution agent.
+
+If these custom types fail to load, automatically fall back to `subagent_type: general-purpose` with the full prompt content from `prompts/agents/filler.md` or `prompts/agents/audit.md`.
+
+Custom agent types are **optional** — users can install them for enhanced observability:
+```bash
+mkdir -p ~/.claude/agents
+ln -sf $(pwd)/prompts/agents/filler.md ~/.claude/agents/filler.md
+ln -sf $(pwd)/prompts/agents/audit.md ~/.claude/agents/audit.md
+```
+
+## Launching the Filler Agent
+
+The filler agent discovers tool metadata and produces the filled audit prompt. Launch as a background Task agent:
+
+- subagent_type: filler (falls back to general-purpose if not installed)
+- run_in_background: true
+- prompt: Instructions with {{TOOL_NAME}}, {{SANDBOX_MODE}}, {{EXEC_PREFIX}}, {{SANDBOX_CONTEXT}}, {{OUTPUT_PATH}} substituted
+
 ## Launching the Audit Agent
 
 The audit agent MUST run in a fresh context with zero knowledge of the project. Launch it as a background Task agent:
 
-- subagent_type: general-purpose
+- subagent_type: audit (falls back to general-purpose if not installed)
 - run_in_background: true
 - prompt: the filled audit prompt content (read from `docs/cold-start-audit-prompt.md` or pass directly as text)
 

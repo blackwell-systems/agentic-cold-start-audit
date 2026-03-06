@@ -6,9 +6,9 @@ Formal specification for the agentic-cold-start-audit protocol. Defines particip
 
 **Skill (Orchestrator):** The synchronous agent running in the user's own Claude Code session. Interprets the slash command, checks preconditions, runs the mode advisory if requested, and launches the Filler and Audit agents. Human confirmation is preserved at the launch step — the skill does not advance to the audit agent without user review of the filled prompt.
 
-**Filler Agent:** An asynchronous agent launched by the skill. Reads the tool's help output (host-side, no sandbox needed), discovers all subcommands and flags, and populates the audit prompt template with real commands and the correct sandbox exec prefix. Produces `docs/cold-start-audit-prompt.md`. Does not execute commands inside the sandbox.
+**Filler Agent (`filler` type):** An asynchronous agent launched by the skill. Reads the tool's help output (host-side, no sandbox needed), discovers all subcommands and flags, and populates the audit prompt template with real commands and the correct sandbox exec prefix. Produces `docs/cold-start-audit-prompt.md`. Does not execute commands inside the sandbox (enforces I2). Custom agent type provides tool restrictions (Read, Write, Bash only) and behavioral instructions. Falls back to `general-purpose` if type not installed.
 
-**Audit Agent:** An asynchronous agent launched by the skill after the filled prompt is ready. Executes every subcommand and flag documented in the filled prompt, inside the configured sandbox, as a simulated new user. Records every output, error, and friction point. Produces `docs/cold-start-audit.md`.
+**Audit Agent (`audit` type):** An asynchronous agent launched by the skill after the filled prompt is ready. Executes every subcommand and flag documented in the filled prompt, inside the configured sandbox, as a simulated new user. Records every output, error, and friction point. Produces `docs/cold-start-audit.md` (enforces I1). Custom agent type provides tool restrictions (Read, Write, Bash only) and behavioral instructions. Falls back to `general-purpose` if type not installed.
 
 ## Execution Model
 
