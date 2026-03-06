@@ -100,7 +100,12 @@ No manual setup needed.
 
 ### Step 2 — Generate the audit prompt
 
-Open `prompts/filler-agent-prompt.md`, substitute the three variables (`{{CONTAINER_NAME}}`, `{{TOOL_NAME}}`, `{{OUTPUT_PATH}}`), and paste the prompt into Claude Code (or any AI agent with bash access).
+**Option A (Recommended):** Use the skill, which handles this automatically:
+```
+/cold-start-audit setup <tool-name> --mode <mode> [args]
+```
+
+**Option B (Manual):** Open `prompts/agents/filler.md`, substitute the variables (`{{TOOL_NAME}}`, `{{SANDBOX_MODE}}`, `{{EXEC_PREFIX}}`, `{{SANDBOX_CONTEXT}}`, `{{OUTPUT_PATH}}`), and paste the prompt into Claude Code.
 
 The filler agent will:
 1. Run `--help` on every subcommand to discover flags and usage

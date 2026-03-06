@@ -11,6 +11,9 @@ The audit's core invariant: **the audit agent must not modify production state.*
 
 Choose the isolation mechanism based on your tool's blast radius:
 
+> **Optional: Enhanced protection with Claude Code sandboxing**
+> Enable Claude Code's built-in sandboxing via `/sandbox` for additional OS-level isolation. This complements the protocol's exec prefix isolation and provides defense-in-depth against prompt injection or malicious dependencies. Not required — the protocol's isolation modes are sufficient on their own. See [Claude Code Sandboxing Docs](https://code.claude.com/docs/en/sandboxing) for details.
+
 | Mode | When to use | Setup required |
 |---|---|---|
 | **Container** | Tool has destructive ops (remove, delete, system writes, package managers) | Docker running, Dockerfile, image build |

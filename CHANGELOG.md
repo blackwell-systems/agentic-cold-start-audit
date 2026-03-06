@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Added
+- **Custom agent types with graceful fallback** (2026-03-06): Added `filler` and `audit` custom agent types in `prompts/agents/` with frontmatter for tool enforcement and observability. Filler type enforces Invariant I2 (read-only, cannot execute in sandbox). Audit type enforces Invariant I1 (sandbox-scoped execution only). Skill updated to use custom types with automatic fallback to `general-purpose` if not installed. Optional installation via symlinks to `~/.claude/agents/`. Provides separate success rates in claudewatch metrics and structural tool restrictions. Pattern matches scout-and-wave implementation. Zero breaking changes. ([commit 71cb6ee](https://github.com/blackwell-systems/agentic-cold-start-audit/commit/71cb6ee))
+- **CLAUDE.md navigation guide** (2026-03-06): Added comprehensive AI agent instructions documenting project structure, core principles, architecture, and key conventions. Emphasizes pure discovery methodology and sandbox isolation invariants. ([commit 71cb6ee](https://github.com/blackwell-systems/agentic-cold-start-audit/commit/71cb6ee))
+- **Claude Code sandboxing integration note** (2026-03-06): Added documentation explaining how Claude Code's built-in OS-level sandboxing complements the protocol's application-level isolation. Two independent defense layers working together. Not required but recommended for enhanced protection.
 - Audit prompt template with variable table, severity tiers, and structured findings format
 - Filler agent prompt that auto-discovers tool metadata from `--help` output and environment
 - Workflow guide with prerequisites, permissions setup, launch steps, and triage process
