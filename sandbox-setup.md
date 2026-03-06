@@ -46,56 +46,95 @@ for any tool with destructive operations (remove, delete, system writes, package
 
 ## Container Design
 
-A sandbox Dockerfile typically uses a **multi-stage build**:
+Container mode expects Dockerfiles following the **audit-ready Dockerfile convention**.
 
+### Contract Requirements
+
+Your Dockerfile must provide:
+
+1. **Multi-stage build** (recommended, not required)
+   - Keeps runtime image small
+   - Separates build dependencies from runtime
+
+2. **Non-root user with sudo**
+   - User must not be root
+   - Passwordless sudo configured
+   - Tests realistic permissions and surfaces bugs
+
+3. **Tool at standard path**
+   - Binary: `/usr/local/bin/<tool-name>`
+   - Must be executable and owned by container user
+
+4. **Clean base environment**
+   - Ubuntu 22.04 or Debian-based
+   - Basic utilities: `curl`, `git`, `sudo`
+   - No unnecessary build deps in final image
+
+5. **Interactive shell**
+   - `CMD ["/bin/bash"]` for agent access
+   - No ENTRYPOINT that blocks shell access
+
+### How to Create
+
+**Option 1: Auto-generate**
+```bash
+/dockerfile-sandbox-gen <tool-name>
 ```
-Stage 1 (builder)
-  - Compiles the tool's binaries for the target platform
+Uses [dockerfile-sandbox-gen](https://github.com/blackwell-systems/dockerfile-sandbox-gen) to create a contract-compliant Dockerfile automatically.
 
-Stage 2 (runtime)
-  - Installs the tool's dependencies (package managers, runtimes, etc.)
-  - Installs a realistic set of packages/data for the audit
-  - Copies compiled binaries from the builder stage
-  - Runs as a non-root user if the tool or its dependencies require it
-```
+**Option 2: Manual creation**
 
-**Use real dependencies, not mocks.** Mocking produces predictable, sanitized output
-that doesn't surface real edge cases. Real package managers have real dependency graphs,
-real metadata, and real edge cases your tool must handle correctly.
-
-### Example skeleton
+Create `Dockerfile.sandbox` following the contract:
 
 ```dockerfile
+# Stage 1: build the tool
 FROM golang:1.23 AS builder
 WORKDIR /src
 COPY . .
 RUN CGO_ENABLED=0 go build -o /out/mytool ./cmd/mytool
 
+# Stage 2: clean runtime environment
 FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y curl git sudo && rm -rf /var/lib/apt/lists/*
 RUN useradd -m -s /bin/bash appuser && echo "appuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 USER appuser
-# Install tool dependencies here
 COPY --from=builder --chown=appuser:appuser /out/mytool /usr/local/bin/mytool
 CMD ["/bin/bash"]
 ```
 
-### Build and run
+Adjust the build stage for your language (Rust, Python, Node, etc.).
+
+**Option 3: Custom Dockerfile**
+
+Use any Dockerfile that meets the contract requirements, specify with `--dockerfile PATH`:
 
 ```bash
-docker build -t <image-name> -f <path/to/Dockerfile> .
-docker run -d --name <container-name> --rm <image-name> sleep 3600
-docker ps --filter name=<container-name>
+/cold-start-audit container build mytool --dockerfile docker/custom.dockerfile
 ```
 
-### Cleanup
+### Contract Validation
+
+Test compliance:
 
 ```bash
-docker rm -f <container-name>   # stop and remove container
-docker rmi <image-name>         # remove image
+docker build -t test-r1 -f Dockerfile.sandbox .
+docker run --rm test-r1 bash -c "whoami && which mytool && sudo -n true && echo '✓ Contract valid'"
 ```
 
----
+Expected output:
+```
+appuser
+/usr/local/bin/mytool
+✓ Contract valid
+```
+
+### Why These Requirements
+
+- **Non-root user**: Simulates realistic user environment, not administrator
+- **Sudo access**: Lets audit test elevated operations without always running as root
+- **Clean base**: Real dependencies surface real edge cases (mocks hide bugs)
+- **Standard path**: `/usr/local/bin` is always in PATH, conventional location
+
 
 ## Agent Access Patterns
 

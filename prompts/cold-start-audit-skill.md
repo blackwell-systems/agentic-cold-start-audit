@@ -280,7 +280,17 @@ fi
 if [ ! -f "$DOCKERFILE_PATH" ]; then
   echo "✗ Error: Dockerfile not found at Dockerfile.sandbox or docker/Dockerfile.sandbox"
   echo ""
-  echo "Create Dockerfile.sandbox first. See:"
+  echo "Container mode requires an audit-ready Dockerfile with:"
+  echo "  - Multi-stage build (builder + runtime)"
+  echo "  - Non-root user with sudo access"
+  echo "  - Tool at /usr/local/bin/<tool-name>"
+  echo ""
+  echo "Options:"
+  echo "  1. Generate: /dockerfile-sandbox-gen <tool-name>"
+  echo "  2. Manual: Create Dockerfile.sandbox (see sandbox-setup.md for template)"
+  echo "  3. Custom: Use --dockerfile PATH to specify a different file"
+  echo ""
+  echo "Contract details:"
   echo "  https://github.com/blackwell-systems/agentic-cold-start-audit/blob/main/sandbox-setup.md#dockerfile-pattern"
   exit 1
 fi
