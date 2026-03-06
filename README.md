@@ -15,25 +15,6 @@ The problem is safety. An agent testing your production system can delete data, 
 
 The result is a severity-tiered findings report: what's broken, what's confusing, what's rough polish. Some findings are blockers. Others are sprint items. The [`/cold-start-audit report`](#commands) command triages them.
 
-## What's New in v1.1
-
-**Fully automated container lifecycle:**
-- `container build` auto-increments rounds (brewprune-r7 → r8), checks for reusable containers, builds & starts automatically
-- `container list` shows all images/containers with status
-- `container cleanup` removes old rounds, keeps latest N
-- No more manual `docker build` / `docker run` commands
-
-**Prerequisites validation:**
-- `preflight` validates all requirements (tool installed, Docker running, permissions configured)
-- Provides actionable fix steps when checks fail
-- Auto-runs before `setup` and `run` commands
-- No more silent failures from missing permissions
-
-**Enhanced observability:**
-- Custom `filler` and `audit` agent types with structural constraints
-- Separate success rates in claudewatch metrics
-- Graceful fallback to general-purpose agents
-
 ## When to Use It
 
 Cold-start auditing is most useful when:
