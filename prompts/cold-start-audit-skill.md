@@ -3,6 +3,10 @@ Cold-Start UX Audit: AI agents simulate new users in sandboxed environments.
 ## Arguments
 
 - `mode <tool-name>`: Analyze the tool's help output and recommend the appropriate sandbox isolation mode. Runs `<tool-name> --help` and each subcommand's `--help`, then answers three questions to produce a mode recommendation (container / local / worktree) with rationale. Does not write any files.
+- `preflight <tool-name> --mode <mode> [mode-args]`: Validate all prerequisites before running an audit. Checks tool installation, permissions, Docker status (container mode), and provides actionable fix steps if any checks fail. Auto-run before `setup` and `run`.
+- `container build <tool-name> [--dockerfile PATH]`: Auto-increment round number, check for reusable containers/images, build new image if needed, and start container. Detects highest existing round (e.g., brewprune-r7) and creates next (brewprune-r8). Offers to reuse if container already running.
+- `container list <tool-name>`: Show all images and containers for a tool with their status (running/stopped/dangling).
+- `container cleanup <tool-name> [--keep-latest N]`: Remove old containers and images, optionally keeping the latest N rounds. Default: keep latest 2.
 - `setup <tool-name> --mode container <container-name>`: Run the filler agent to discover tool metadata from the running container and produce a filled audit prompt. Write the filled prompt to `docs/cold-start-audit-prompt.md`.
 - `setup <tool-name> --mode local --env KEY=VALUE [--env KEY=VALUE ...]`: Run the filler agent in local mode. Creates temp dir, sets env vars, discovers tool metadata from the host, produces filled prompt.
 - `setup <tool-name> --mode worktree --dir <source-path>`: Run the filler agent in worktree mode. Copies `<source-path>` to a temp dir, discovers tool metadata from inside it, produces filled prompt.
@@ -48,28 +52,382 @@ When running subsequent audits on the same tool:
 
 This prevents wasteful parallel execution of filler agent when audit agent doesn't need it.
 
-## Before Running
+## Preflight Validation (`preflight <tool-name> --mode <mode> [args]`)
 
-Verify these prerequisites. If any fail, guide the user through fixing them.
+Validate all prerequisites before launching agents. Automatically run before `setup` and `run` commands. Fail early with actionable fix steps.
 
-**All modes:**
-1. **Tool is installed on the host** (or in the container) — `<tool-name> --help` should succeed
-2. **Bash permissions are configured** — check `.claude/settings.json` (see Permissions below)
+### All Modes - Common Checks
 
-**Container mode only:**
-3. **Docker is running** — `docker ps` should succeed
-4. **Sandbox container exists and is running** — `docker ps --filter name=<container-name>`
-5. **Tool is installed inside the container** — `docker exec <container-name> <tool-name> --help`
+**1. Tool installation:**
+```bash
+<tool-name> --help
+```
+- **✓ Pass:** Command succeeds, help text displayed
+- **✗ Fail:** Command not found or errors
+  - **Fix:** Install the tool first. Check installation docs.
 
-If the container doesn't exist, help the user create one. See the Container Setup section in `sandbox-setup.md`.
+**2. Bash permissions:**
+```bash
+# Check ~/.claude/settings.json for:
+{
+  "permissions": {
+    "allow": ["Bash", "Read", "Write"]
+  }
+}
+```
+- **✓ Pass:** "Bash" in allow list
+- **✗ Fail:** Missing or using invalid format (`allow_bash: true`)
+  - **Fix:**
+    ```bash
+    # Edit ~/.claude/settings.json and add:
+    {
+      "permissions": {
+        "allow": ["Bash", "Read", "Write"]
+      }
+    }
+    # Then restart Claude Code session (settings don't hot-reload)
+    ```
 
-**Local mode only:**
-3. **Temp directory is created** — create it before launching: `mkdir -p $(dirname $STATE_PATH)`
-4. **Tool accepts the env var** — verify with a dry run: `env KEY=VALUE <tool-name> --help`
+**3. Session restart check:**
+- **Warn:** "If you edited settings recently, restart Claude Code now. Settings are loaded at session start only."
 
-**Worktree mode only:**
-3. **Source directory exists** — `ls <source-path>` should succeed
-4. **Temp copy is created** — the skill copies `<source-path>` to a temp dir before launching
+**4. Hooks check:**
+```bash
+# Parse ~/.claude/settings.json for PreToolUse hooks on Bash
+# For each hook script referenced, check:
+ls <hook-script-path>
+```
+- **✓ Pass:** All hook scripts exist
+- **✗ Fail:** Hook script missing
+  - **Fix:** Remove hook reference from settings or create stub script
+
+### Container Mode - Additional Checks
+
+**5. Docker running:**
+```bash
+docker ps
+```
+- **✓ Pass:** Command succeeds, shows container list
+- **✗ Fail:** Cannot connect to Docker daemon
+  - **Fix:**
+    ```bash
+    # macOS/Linux:
+    # Check if Docker Desktop is running, or start docker service
+    sudo systemctl start docker  # Linux
+    # macOS: Open Docker Desktop app
+    ```
+
+**6. Container exists and is running:**
+```bash
+docker ps --filter name=<container-name> --format '{{.Names}}'
+```
+- **✓ Pass:** Container name appears in output
+- **✗ Fail:** No output (container not running)
+  - **Check if container exists but is stopped:**
+    ```bash
+    docker ps -a --filter name=<container-name> --format '{{.Names}}'
+    ```
+  - **Fix (container exists):**
+    ```bash
+    docker start <container-name>
+    ```
+  - **Fix (container doesn't exist):**
+    ```bash
+    # Use the container build command:
+    /cold-start-audit container build <tool-name>
+
+    # Or manually:
+    docker run -d --name <container-name> <image-name> sleep 3600
+    ```
+
+**7. Tool installed in container:**
+```bash
+docker exec <container-name> <tool-name> --help
+```
+- **✓ Pass:** Help text displayed
+- **✗ Fail:** Command not found in container
+  - **Fix:** Rebuild image with tool installed. Check Dockerfile.sandbox.
+
+### Local Mode - Additional Checks
+
+**8. Temp directory writable:**
+```bash
+# Extract temp path from env var args
+TEMP_DIR=$(echo "<env args>" | grep -oP '/tmp/[^"]+' | head -1 | xargs dirname)
+mkdir -p $TEMP_DIR && touch $TEMP_DIR/.test && rm $TEMP_DIR/.test
+```
+- **✓ Pass:** Directory created and writable
+- **✗ Fail:** Permission denied
+  - **Fix:**
+    ```bash
+    # Use a path you have write access to:
+    mkdir -p /tmp/audit-$$
+    # Then use: --env MYTOOL_DB=/tmp/audit-$$/db
+    ```
+
+**9. Tool respects env var:**
+```bash
+env <KEY=VALUE> <tool-name> --help
+```
+- **✓ Pass:** Command succeeds with env var set
+- **✗ Fail:** Tool errors or ignores env var
+  - **Fix:** Check tool docs for correct env var name. Tool may not support env var isolation.
+
+### Worktree Mode - Additional Checks
+
+**10. Source directory exists:**
+```bash
+ls <source-path>
+```
+- **✓ Pass:** Directory exists and readable
+- **✗ Fail:** No such file or directory
+  - **Fix:** Check the path. Use absolute path or correct relative path.
+
+### Output Format
+
+When all checks pass:
+```
+✓ Preflight checks passed (10/10)
+
+All prerequisites met. Ready to run audit.
+
+Next: /cold-start-audit run <tool-name> --mode <mode> [args]
+```
+
+When checks fail:
+```
+✗ Preflight checks failed (7/10 passed)
+
+Failures:
+  ✗ Docker not running
+    Fix: Start Docker Desktop or run: sudo systemctl start docker
+
+  ✗ Container brewprune-r8 not found
+    Fix: /cold-start-audit container build brewprune
+    Or manually: docker run -d --name brewprune-r8 brewprune-r8 sleep 3600
+
+  ✗ Tool not installed in container
+    Fix: Rebuild image. Check Dockerfile.sandbox includes tool installation.
+
+Run these fixes, then retry: /cold-start-audit preflight <tool-name> --mode <mode> [args]
+```
+
+**Auto-integration:** `setup` and `run` commands automatically run preflight first. If preflight fails, stop and show fix steps. User must resolve before continuing.
+
+## Container Lifecycle Management
+
+### `container build <tool-name> [--dockerfile PATH]`
+
+Automate the container build workflow: auto-increment round number, check for reusable containers, build and start.
+
+**Step 1: Auto-detect round number**
+```bash
+# Find highest existing round
+HIGHEST=$(docker images --format '{{.Repository}}' | grep "^${TOOL_NAME}-r" | sed 's/.*-r//' | sort -n | tail -1)
+
+if [ -z "$HIGHEST" ]; then
+  NEXT_ROUND=1
+else
+  NEXT_ROUND=$((HIGHEST + 1))
+fi
+
+CONTAINER_NAME="${TOOL_NAME}-r${NEXT_ROUND}"
+IMAGE_NAME="${TOOL_NAME}-r${NEXT_ROUND}"
+```
+
+**Step 2: Check for reusable container**
+```bash
+RUNNING=$(docker ps --filter name=^${CONTAINER_NAME}$ --format '{{.Names}}')
+
+if [ -n "$RUNNING" ]; then
+  echo "✓ Container $CONTAINER_NAME already running"
+  echo "Reusing existing container. No build needed."
+  echo ""
+  echo "Next: /cold-start-audit run $TOOL_NAME --mode container $CONTAINER_NAME"
+  exit 0
+fi
+```
+
+**Step 3: Check for existing image (source unchanged)**
+```bash
+IMAGE_EXISTS=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep "^${IMAGE_NAME}:")
+
+if [ -n "$IMAGE_EXISTS" ]; then
+  echo "? Image $IMAGE_NAME exists. Options:"
+  echo "  1. Reuse existing image (fast, use if source code unchanged)"
+  echo "  2. Rebuild image (use if source code changed since last audit)"
+
+  # Ask user or default to reuse
+  read -p "Choice [1/2]: " CHOICE
+
+  if [ "$CHOICE" = "1" ]; then
+    echo "Starting container from existing image..."
+    docker run -d --name $CONTAINER_NAME --rm $IMAGE_NAME sleep 3600
+    echo "✓ Container $CONTAINER_NAME started"
+    exit 0
+  fi
+fi
+```
+
+**Step 4: Build new image**
+```bash
+# Find Dockerfile
+DOCKERFILE_PATH="${DOCKERFILE_ARG:-Dockerfile.sandbox}"
+if [ ! -f "$DOCKERFILE_PATH" ]; then
+  DOCKERFILE_PATH="docker/Dockerfile.sandbox"
+fi
+
+if [ ! -f "$DOCKERFILE_PATH" ]; then
+  echo "✗ Error: Dockerfile not found at Dockerfile.sandbox or docker/Dockerfile.sandbox"
+  echo ""
+  echo "Create Dockerfile.sandbox first. See:"
+  echo "  https://github.com/blackwell-systems/agentic-cold-start-audit/blob/main/sandbox-setup.md#dockerfile-pattern"
+  exit 1
+fi
+
+echo "Building image $IMAGE_NAME from $DOCKERFILE_PATH..."
+docker build -t $IMAGE_NAME -f $DOCKERFILE_PATH .
+
+if [ $? -ne 0 ]; then
+  echo "✗ Build failed"
+  exit 1
+fi
+
+echo "✓ Image built: $IMAGE_NAME"
+```
+
+**Step 5: Start container**
+```bash
+echo "Starting container..."
+docker run -d --name $CONTAINER_NAME --rm $IMAGE_NAME sleep 3600
+
+if [ $? -ne 0 ]; then
+  echo "✗ Failed to start container"
+  exit 1
+fi
+
+echo "✓ Container started: $CONTAINER_NAME"
+echo ""
+echo "Next: /cold-start-audit run $TOOL_NAME --mode container $CONTAINER_NAME"
+```
+
+**Output example:**
+```
+Auto-detected round: brewprune-r8 (highest existing: brewprune-r7)
+
+Building image brewprune-r8 from Dockerfile.sandbox...
+[docker build output...]
+✓ Image built: brewprune-r8
+
+Starting container...
+✓ Container started: brewprune-r8
+
+Next: /cold-start-audit run brewprune --mode container brewprune-r8
+```
+
+### `container list <tool-name>`
+
+Show all images and containers for a tool with status.
+
+**Implementation:**
+```bash
+TOOL_NAME="$1"
+
+echo "Images for $TOOL_NAME:"
+echo ""
+docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedSince}}' | grep "^${TOOL_NAME}-r"
+
+echo ""
+echo "Containers for $TOOL_NAME:"
+echo ""
+docker ps -a --filter name="^${TOOL_NAME}-r" --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+```
+
+**Output example:**
+```
+Images for brewprune:
+
+REPOSITORY      TAG     SIZE    CREATED
+brewprune-r7    latest  156MB   2 days ago
+brewprune-r8    latest  157MB   5 hours ago
+
+Containers for brewprune:
+
+NAMES           STATUS                  IMAGE
+brewprune-r7    Exited (0) 2 days ago   brewprune-r7
+brewprune-r8    Up 5 hours              brewprune-r8
+```
+
+### `container cleanup <tool-name> [--keep-latest N]`
+
+Remove old containers and images, keeping the latest N rounds.
+
+**Implementation:**
+```bash
+TOOL_NAME="$1"
+KEEP_LATEST="${KEEP_LATEST:-2}"  # Default: keep 2 most recent
+
+# Get all rounds sorted
+ALL_ROUNDS=$(docker images --format '{{.Repository}}' | grep "^${TOOL_NAME}-r" | sed 's/.*-r//' | sort -n)
+TOTAL_ROUNDS=$(echo "$ALL_ROUNDS" | wc -l)
+
+if [ "$TOTAL_ROUNDS" -le "$KEEP_LATEST" ]; then
+  echo "✓ Only $TOTAL_ROUNDS rounds exist. No cleanup needed (keeping latest $KEEP_LATEST)."
+  exit 0
+fi
+
+ROUNDS_TO_REMOVE=$(echo "$ALL_ROUNDS" | head -n $((TOTAL_ROUNDS - KEEP_LATEST)))
+
+echo "Found $TOTAL_ROUNDS rounds. Keeping latest $KEEP_LATEST."
+echo ""
+echo "Rounds to remove:"
+for ROUND in $ROUNDS_TO_REMOVE; do
+  echo "  - ${TOOL_NAME}-r${ROUND}"
+done
+echo ""
+read -p "Continue? [y/N]: " CONFIRM
+
+if [ "$CONFIRM" != "y" ]; then
+  echo "Cancelled."
+  exit 0
+fi
+
+for ROUND in $ROUNDS_TO_REMOVE; do
+  NAME="${TOOL_NAME}-r${ROUND}"
+
+  # Remove container (if exists)
+  docker rm -f $NAME 2>/dev/null && echo "✓ Removed container: $NAME" || echo "  (no container)"
+
+  # Remove image
+  docker rmi $NAME 2>/dev/null && echo "✓ Removed image: $NAME" || echo "✗ Failed to remove image: $NAME"
+done
+
+echo ""
+echo "✓ Cleanup complete"
+```
+
+**Output example:**
+```
+Found 8 rounds. Keeping latest 2.
+
+Rounds to remove:
+  - brewprune-r1
+  - brewprune-r2
+  - brewprune-r3
+  - brewprune-r4
+  - brewprune-r5
+  - brewprune-r6
+
+Continue? [y/N]: y
+
+✓ Removed container: brewprune-r1
+✓ Removed image: brewprune-r1
+  (no container)
+✓ Removed image: brewprune-r2
+...
+
+✓ Cleanup complete
+```
 
 ## Permissions
 
@@ -113,7 +471,7 @@ The audit simulates a new user on a fresh machine. A Docker container gives a cl
 
 Containers follow the pattern **`{tool}-r{N}`** where N is the audit round number (1, 2, 3…).
 
-**Auto-increment logic** — before creating a new container, determine N automatically:
+**Auto-increment logic** — use the `container build` command which handles this automatically, or manually:
 
 ```bash
 # Find the highest existing round number for this tool
@@ -125,17 +483,7 @@ If no existing images are found, start at r1.
 
 ### Container Reuse
 
-**Before building a new image, check if a usable container already exists:**
-
-```bash
-docker ps --filter name={tool}-r{N} --format '{{.Names}}'
-```
-
-- **Container is running** → reuse it directly. Skip build and `docker run`. The binary is already in place.
-- **Image exists but container is stopped** → start a new container from the existing image: `docker run -d --name {tool}-r{N} {tool}-r{N} sleep 3600`
-- **No image exists** → build from scratch (see First-time setup below)
-
-Only rebuild the image when source code has changed since the last audit round. If you just want to re-audit the same binary, reuse the existing image.
+The `container build` command handles reuse automatically. It checks if a container is already running and offers to reuse it instead of rebuilding.
 
 ### Container Lifecycle
 
@@ -170,7 +518,13 @@ Adapt the builder stage and dependencies for the tool's language and requirement
 
 ### First-time setup
 
-For the initial audit round:
+For the initial audit round, use the automated command:
+
+```bash
+/cold-start-audit container build <tool-name>
+```
+
+Or manually:
 
 ```bash
 # Create Dockerfile.sandbox (see pattern above)
@@ -184,22 +538,11 @@ docker ps --filter name=mytool-r1
 
 ### Subsequent rounds
 
-For subsequent audit cycles (the agent discovers with fresh eyes each time):
-
-1. **Auto-increment** the round number (see Container Naming Convention above)
-2. **Check for reuse** (see Container Reuse above) — if the binary hasn't changed, reuse the existing image
-3. If source changed, rebuild:
+Use the automated workflow:
 
 ```bash
-# Determine next round number (e.g. r7 → r8)
-PREV=mytool-r7
-NEXT=mytool-r8
-# Stop old container if running
-docker rm -f $PREV 2>/dev/null || true
-# Rebuild image from EXISTING Dockerfile with new round tag
-docker build -t $NEXT -f docker/Dockerfile.sandbox .
-# Start new container
-docker run -d --name $NEXT $NEXT sleep 3600
+/cold-start-audit container build <tool-name>
+# Auto-detects highest round, offers reuse if unchanged, builds if needed
 ```
 
 **Key principle:** The Dockerfile.sandbox is stable infrastructure. Only the image (built binary) and container (running instance) change between rounds.
@@ -215,7 +558,13 @@ Do NOT recreate the Dockerfile just because the tool's source code changed — r
 
 ### Cleanup
 
-After completing an audit round:
+Use the automated command:
+
+```bash
+/cold-start-audit container cleanup <tool-name> --keep-latest 2
+```
+
+Or manually:
 
 ```bash
 # Remove container (happens automatically with --rm flag when container stops)
@@ -255,8 +604,9 @@ Confidence: high | medium | low
 
 If medium or low — explain what's ambiguous and how to resolve it.
 
-Suggested command:
-  /cold-start-audit setup <tool-name> --mode <mode> [mode-specific args]
+Suggested commands:
+  /cold-start-audit container build <tool-name>  # (if container mode)
+  /cold-start-audit run <tool-name> --mode <mode> [mode-specific args]
 ```
 
 If the tool clearly fits multiple modes (e.g., has both destructive ops AND a self-contained DB), recommend **container** — it's the most conservative isolation.
@@ -311,26 +661,24 @@ Build a numbered list of areas with exact commands (not placeholders). Use the e
 Produce a self-contained audit prompt with all variables substituted. Write to `docs/cold-start-audit-prompt.md`. The filled prompt must follow this structure:
 
 ```
-# Cold-Start UX Audit Report
+# Cold-Start UX Audit Prompt
 
 **Metadata:**
 - Audit Date: <YYYY-MM-DD>
-- Tool Version: <tool-name> <version>
+- Tool: <tool-name>
+- Tool Version: <version from --version>
 - Sandbox mode: container | local | worktree
 - Sandbox: <container-name | env vars | temp dir path>
-- Environment: <OS, or "host" for local/worktree mode>
+- Exec prefix: `<exec-prefix>`
 
 ---
 
 You are performing a UX audit of <tool-name> — a tool that <description from help>.
 You are acting as a **new user** encountering this tool for the first time.
 
-<sandbox context — one of:>
-  Container: You have access to a Docker container called `<container-name>` with <tool-name> installed and the following packages available: <installed packages>.
-  Local: You are running <tool-name> on the host with state isolated to a temp directory via env vars: <KEY=VALUE list>. The tool's real data is unaffected.
-  Worktree: You are working inside a fresh copy of <source-path> at <temp-dir>. The original directory is unaffected.
+Sandbox: <sandbox context>
 
-Run all commands using: `docker exec <container-name> <command>`
+Run all commands using: `<exec-prefix> <command>`
 
 ## Audit Areas
 
@@ -378,6 +726,21 @@ The prompt template above is complete. DO NOT append:
 
 Every audit must be pure discovery with zero context. If old issues regressed, they surface through organic rediscovery (agent encounters the same friction) not through explicit verification checklists. Adding regression sections violates the methodology's core principle: the agent simulates a new user with no prior knowledge.
 
+### Step 5 — Validate the filled prompt
+
+Before returning, check for unfilled placeholders:
+
+```bash
+grep -o '{{[^}]*}}' docs/cold-start-audit-prompt.md
+```
+
+If any placeholders remain, report them as errors and do NOT launch the audit agent. Common issues:
+- `{{TOOL_NAME}}` — forgot to substitute tool name
+- `{{EXEC_PREFIX}}` — forgot to substitute docker exec or env prefix
+- `{{AUDIT_AREAS}}` — didn't construct the command list
+
+**Fix:** Re-run filler agent or manually edit the prompt file.
+
 ## Agent Type Preference
 
 Use custom agent types when launching agents. These provide:
@@ -418,10 +781,11 @@ The agent will run 30+ commands in the sandbox, observe behavior at each step, a
 **IMPORTANT - Sequencing:**
 
 When regenerating the prompt (not reusing):
-1. Launch filler agent OR run filler steps directly
-2. **Wait for completion** - filler must finish writing the prompt file
-3. Read the completed prompt from the file
-4. **Then** launch audit agent with that prompt content
+1. **Run preflight first** — auto-validates prerequisites
+2. Launch filler agent OR run filler steps directly
+3. **Wait for completion** - filler must finish writing the prompt file
+4. **Validate prompt** - check for unfilled placeholders
+5. **Then** launch audit agent with that prompt content
 
 **Anti-pattern to avoid:**
 - ❌ Launching filler agent in background + immediately launching audit agent with manually-edited old prompt = wasteful parallel execution
@@ -437,4 +801,4 @@ The audit agent receives the prompt as text in its Task invocation, so it doesn'
 | UX-improvement | Confusing but functional | Prioritize for next sprint |
 | UX-polish | Minor friction or inconsistency | Batch into a cleanup PR |
 
-The audit agent must run ALL commands via `docker exec <container-name>` - never run the tool directly on the host.
+The audit agent must run ALL commands via the exec prefix - never bypass the sandbox.
