@@ -17,7 +17,7 @@ A two-agent protocol for discovering cold-start UX friction in CLI tools. A fill
 
 ### Install the Skill
 
-> [!NOTE]
+> [!WARNING]
 > The steps below are for Claude Code. If you're using a different Agent Skills-compatible tool (Cursor, Gemini CLI, GitHub Copilot, etc.), the install path will differ — but the skill directory structure is identical. Copy `prompts/cold-start-audit-skill/` to wherever your tool expects skills to live.
 
 ```bash
